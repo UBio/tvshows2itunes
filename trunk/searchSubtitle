@@ -12,7 +12,8 @@ my $app_name="TVShow2iTunes";
 my $ua = LWP::UserAgent->new();
 my $useragent=$ua->agent($app_name);
 my $cli;
-my $video;
+my $videoSRT;
+my $convert=undef;
 if(scalar(@ARGV)>0){
 	#Log into subtitles to get the token
 	my $login=login();
@@ -21,13 +22,12 @@ if(scalar(@ARGV)>0){
 		#getting the filename
 		my $fname=substr($filename, rindex($filename,"/")+1,length($filename)-rindex($filename,"/")-1);
 		print STDERR "Searching for $fname\n";
-		#Notifing to the user;
 		
 		#getSubtitle
-		my $imdb=GetSubtitles($filename,$login);
+		GetSubtitles($filename,$login);
 		
 		##Getting the metadata########
-		getMetaDataIMDBAPI($imdb);
+		getMetaDataIMDBAPI($videoSRT->{IDMovieImdb}->value);
 		#getMetaDataIMDBPERL($imdb);
 		#getMetaDataOpen($imdb);
 		#############################
@@ -64,20 +64,125 @@ sub Recoding{
 	my $inputfilename=shift;
 	my $outputfilename = substr $inputfilename, 0, rindex( $inputfilename, q{.} );
 	$outputfilename.=".m4v";
-	#./SublerCLI -l Spanish -n Spanish -i ~/Proyectos/Organizer/Data/misfits.s01e03.720p.hdtv.x264-bia.mkv -o ~/Proyectos/Organizer/Data/misfits.s01e03.720p.hdtv.x264-bia.m4v 
-	#-t "{TV Show:Misfits}{TV Episode:3}{TV Season:1}{HD Video:1}{Name:Chapter Three}{Artwork:/Users/eandres/Proyectos/Organizer/Scripts/Misfitss01.jpg}{Media Kind:TV Show}" 
-	#./SublerCLI -i ~/Proyectos/Organizer/Scripts/misfits.s01e03.720p.hdtv.x264-bia.es.srt -o ~/Proyectos/Organizer/Data/misfits.s01e03.720p.hdtv.x264-bia.m4v
-	my $movieName=$video->{MovieName}->value;
+	$outputfilename=quotemeta($outputfilename);
+	
+	my ($videoS,$audio)=getStreams($inputfilename);
+
+	my $movieName=$videoSRT->{MovieName}->value;
 	my $tvShow;
 	my $tvChapter;
 	my $tvSeason;
 	
+	#Notifing to the user;
 	`bin/growlnotify -m "Converting  $movieName"`;
+	$convert=1;
+	$inputfilename=quotemeta $inputfilename;
+	my $ac3file="$inputfilename.ac3";
+	my $h264file="$inputfilename.h264";
+	my $aacfile="$inputfilename.aac";
 	
-	my $cmd="bin/SublerCLI -l " . $video->{LanguageName}->value ." -n ". $video->{LanguageName}->value ." -i ".$inputfilename ." -o ". $outputfilename . " -t \"{TV Show:".$movieName."}{TV Episode:3}{TV Season:1}{HD Video:0}{Name:". $movieName."}{Artwork:".$video->{cover}."}{Media Kind:TV Show}\" -O";
-	print "\n". $cmd ."\n";
-	#print "FILE :: To create $outputfilename\t(" . $video->{MovieName}->value . ")\n";
-	system($cmd);
+	my $Video_cmd="bin/mkvextract tracks $inputfilename ".$videoS->{id}.":$h264file &>/dev/null";
+	my $audio_cmd="bin/mkvextract tracks $inputfilename ".$audio->{id}.":$ac3file &>/dev/null";
+	my $audio_cmd_convert="bin/mencoder $inputfilename -aid 0 -ovc copy -oac faac -faacopts br=160:mpeg=4:object=2 -channels $audio->{Channel} -srate $audio->{Sampling_rate}000 -of rawaudio -o $aacfile &>/dev/null" if ($convert);
+	my $m4v_cmd ="bin/mp4box -add $inputfilename\.h264:lang=$audio->{language} -add $inputfilename\.ac3:lang=$audio->{language} -add $inputfilename\." .  $videoSRT->{ISO639}->value . "." . $videoSRT->{SubFormat}->value .":lang=" . $videoSRT->{LanguageName}->value.":group=2:disable -add $inputfilename\.aac:lang=".$audio->{language}." -disable 2 -group-add trackId=2:trackId=4 -keepall -new -fps $videoS->{Frate} $outputfilename &>/dev/null";
+	#print "$Video_cmd\n$audio_cmd\n$audio_cmd_convert\n$m4v_cmd\n";
+	#print "FILE :: To create $outputfilename\t(" . $videoSRT->{MovieName}->value . ")\n";
+	
+	print "LOG :: Extracting H.264 file\n";
+	system($Video_cmd);
+	print "LOG :: Extracting Audio file\n";
+	system($audio_cmd);
+	print "LOG :: Extracting Audio ACC file\n";
+	system($audio_cmd_convert);
+	print "LOG :: Creation $outputfilename\n";
+	system($m4v_cmd);
+	print "LOG :: Done !\n";
+	system("rm $ac3file");
+	system("rm $h264file");
+	system("rm $aacfile");
+}
+sub getStreams{
+	my $inputfilename=shift;
+	$inputfilename=quotemeta($inputfilename);
+	my $log_file="/tmp/.$$\.log" . ".log";
+	system("bin/mediainfo $inputfilename --LogFile=$log_file --Output=XML 0 1 2 > /dev/null");
+	my $Sampling_rate;
+	my $audio;	
+	my $videoS;	
+	my $type;
+	my $id;
+	my $Bdepth;
+	my $language;
+	my $Codec_ID;
+	my $Channel;
+	open(XML,$log_file) || die "$! ($log_file)";
+	while(my $line=<XML>){
+		chomp($line);
+		if($line =~ /^<\/track>/){
+			if($type and $id and $Bdepth and $language and $Codec_ID and $Sampling_rate and $Channel){
+				#print "//\nType $type\nID $id\nBdepth $Bdepth\nLangage $language\nCodec_ID $Codec_ID\nSampling_rate $Sampling_rate\nChannel $Channel\n//\n";
+				$audio->{type}=$type;
+				$audio->{Bdepth}=$Bdepth;
+				$audio->{Codec_ID}=$Codec_ID;
+				$audio->{language}=$language;
+				$audio->{Channel}=$Channel;
+				$audio->{id}=$id;
+				$audio->{Sampling_rate}=$Sampling_rate;
+			}
+			next;
+		}
+		elsif($line =~ /^<track type="Audio"/){
+			$type="Audio";
+		}
+		elsif($line =~ /<ID>(\d+)<\/ID>/ ){
+			$id=$1;
+		}elsif($line =~ /<Bit_depth>(\d+) bits<\/Bit_depth>/ ){
+			$Bdepth=$1;
+		}elsif($line =~ /<Language>(\w+)<\/Language>/ ){
+			$language=$1;
+		}elsif($line =~ /<Codec_ID>(.+)<\/Codec_ID>/){
+			$Codec_ID=$1;
+		}elsif($line =~ /<Sampling_rate>(\d+)\.0 KHz<\/Sampling_rate>/){
+			$Sampling_rate=$1;
+		}elsif($line =~ /<Channel_s_>(\d+) channels<\/Channel_s_>/){
+			$Channel=$1;
+		}elsif($line =~ /<track type="Video">/ ){
+			next;
+		}
+	}
+	close XML;
+	my $type;
+	my $id;
+	my $FProfile;
+	my $Frate;
+	open(XML,$log_file) || die "$!";
+	while(my $line=<XML>){
+		chomp($line);
+		if($line =~ /^<\/track>/){
+			if($type and $id and $FProfile and $Frate){
+				# print "//\nType $type\nID $id\n$FProfile $FProfile\nFrate $Frate\n//\n";
+				$videoS->{type}=$type;
+				$videoS->{FProfile}=$FProfile;
+				$videoS->{Frate}=$Frate;
+				$videoS->{id}=$id;
+				return($videoS,$audio);
+			}
+			next;
+		}
+		elsif($line =~ /^<track type="Video"/){
+			$type="Video";
+		}
+		elsif($line =~ /<ID>(\d+)<\/ID>/ ){
+			$id=$1;
+		}elsif($line =~ /<Format_profile>(.+)<\/Format_profile>/ ){
+			$FProfile=$1;
+		}elsif($line =~ /<Frame_rate>(.+) fps<\/Frame_rate>/ ){
+			$Frate=$1;
+		}elsif($line =~ /<track type="Audio">/ ){
+			next;
+		}
+	}
+	close XML;	
 }
 sub getMetaDataOpen{
 	my $imdb=shift;
@@ -100,32 +205,13 @@ sub getMetaDataIMDBAPI{
 		my $response = $ua->get($url,':content_file' => $tmp_file);
 		if(-s $tmp_file >26){
 			my $data = XMLin($tmp_file);
-			#print Dumper($data);
-			# print $data->{movie}->{plot} ."\n";
-			foreach my $a (keys %{$data->{movie}}){
-				#print $a ."\t". $data->{movie}->{$a} ."\n";
-			}
 			my @artworkName=split(/\//,$data->{movie}->{poster});
 			my $artworkFile="/tmp/".$artworkName[$#artworkName];
 			my $response = $ua->get( $data->{movie}->{poster},':content_file' => $artworkFile);
 		         die "Can't get " . $artworkName[$#artworkName]."  -- ", $response->status_line unless $response->is_success;
-			print STDERR "ArtWork: $artworkFile\n";
-			$video->{cover}=$artworkFile;
-			# 'released' => 'N/A',
-			#         'genre' => 'Comedy, Drama, Fantasy, Sci-Fi',
-			#         'rating' => '8.0',
-			#         'director' => 'Tom Harper',
-			#         'writer' => 'Howard Overman',
-			#         'runtime' => 'N/A',
-			#         'plot' => 'Alisha reveals her feelings for Curtis. They aim for a relationship but must be careful,given her powers. Shygirl 18 proves to be Sally,girl-friend of the dead Tony,who is suspicious about his disappearance though Simon booked a one-way flight in Tony\'s name,using his visa card,to imply he had left the country.Workmen are digging the ground where the bodies were buried so the group have to move them into another hole. They are almost caught by Sally but Curtis saves the situation by turning back time and the operation is successfully completed.',
-			#         'title' => 'Episode #1.3',
-			#         'id' => 'tt1548850',
-			#         'votes' => '111',
-			#         'year' => '2009',
-			#         'rated' => 'N/A',
-			#         'poster' => 'http://ia.media-imdb.com/images/M/MV5BMjAxNTk2MjM2NF5BMl5BanBnXkFtZTcwMjQyNDMyNA@@._V1_SX320.jpg',
-			#         'actors' => 'Antonia Thomas, Lauren Socha, Iwan Rheon, Robert Sheehan'
-			print "=============================================================================\n";
+			#print STDERR "ArtWork: $artworkFile\n";
+			$videoSRT->{cover}=$artworkFile;
+			#print "=============================================================================\n";
 		}
 	}else{
 		print STDERR "ERROR :: Wrong IMDBiD\n";
@@ -174,19 +260,14 @@ sub GetSubtitles{
 	}
 	else
 	{
-		print "=============================================================================\n";
+		print "LOG :: Searching subtitles\n";
 		my $imdb;
 		my $array_ref;
 		foreach my $subtitle_info ( @{$result->{data}} )
 		{
 			foreach my $a (keys %{$subtitle_info}){
-			 	#print $a ."\t". $subtitle_info->{$a}->value ."\n";
-				$video->{$a}=$subtitle_info->{$a};
+				$videoSRT->{$a}=$subtitle_info->{$a};
 			}
-			print "MovieName\t".$subtitle_info->{MovieName}->value ."\n";
-			print "LanguageName\t".$subtitle_info->{LanguageName}->value ."\n";
-			print "SubDownloadLink\t".$subtitle_info->{SubDownloadLink}->value . "\n";
-    
 	    	my $gzfilename=$filename. "." .  $subtitle_info->{ISO639}->value . "." . $subtitle_info->{SubFormat}->value .".gz";
 			my $srtfilename=$filename. "." .  $subtitle_info->{ISO639}->value . "." . $subtitle_info->{SubFormat}->value;
 
@@ -198,11 +279,6 @@ sub GetSubtitles{
 			unlink($gzfilename);
 			
 		}
-		#$IDSubtitleFiles->(int 1952647922);
-		#$array_ref = [ 1952647922,1952647923];
-		#print \$IDSubtitleFiles;
-		#my $Download=$cli->('DownloadSubtitles',$log->{token}->value,$array_ref);
-
 		return($imdb) if($imdb>1);
 	}
 
