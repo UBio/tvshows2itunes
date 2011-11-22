@@ -603,7 +603,7 @@ sub main{
 		GetSubtitles($filename,$login);
 
 		##Getting the metadata########
-		#getMetaDataIMDBAPI($videoSRT->{IDMovieImdb}->value);
+		getMetaDataIMDBAPI($videoSRT->{IDMovieImdb}->value);
 		#getMetaDataIMDBPERL($imdb);
 		#getMetaDataOpen($imdb);
 		#############################
@@ -612,6 +612,8 @@ sub main{
 		if($transcode){
 			Recoding($filename,$transcode);
 		}
+	}else{
+		print STDERR "ERROR :: Input file¿?\n";
 	}
 }
 sub login{
@@ -683,11 +685,29 @@ sub Recoding{
 		system("rm $ac3file");
 		system("rm $h264file");
 		system("rm $aacfile");
+		MetaData($outputfilename);
 	}
 	else{
 		print STDERR "ERROR :: At this moment only mkv files can be transcoded\n";
 		return();
 	}
+}
+sub MetaData{
+	my $inputfilename=shift;
+	my $cmd="bin/AtomicParsley $inputfilename --overWrite ";
+	$cmd .="--artwork ". $videoSRT->{cover}." ";
+	$cmd .="--TVShowName Misfits ";
+	$cmd .="--stik \"TV Show\" ";
+	$cmd .="--TVEpisode \"".$videoSRT->{title}."\" ";
+	$cmd .="--TVSeasonNum 1 ";
+	$cmd .="--title \"".$videoSRT->{title}."\" ";
+	$cmd .="--genre \"".$videoSRT->{genre}."\" ";
+	$cmd .="--comment \"".$videoSRT->{plot}."\" ";
+	$cmd .="--year \"".$videoSRT->{year}."\" ";
+	$cmd .="--description \"".$videoSRT->{plot}."\" ";
+	#print "Atomic:: $cmd\n";
+	system($cmd);
+	#bin/AtomicParsley ../Data/misfits.s01e03.720p.hdtv.x264-bia_iPad.m4v --artwork /tmp/MV5BMjAxNTk2MjM2NF5BMl5BanBnXkFtZTcwMjQyNDMyNA@@._V1_SX320.jpg  --TVShowName Misfits --stik "TV Show" --TVEpisode "Chapter Three" --TVSeasonNum 1 --title "Misfists Chapter Three"
 }
 sub getStreams{
 	my $inputfilename=shift;
@@ -797,9 +817,10 @@ sub getMetaDataIMDBAPI{
 			my $artworkFile="/tmp/".$artworkName[$#artworkName];
 			my $response = $ua->get( $data->{movie}->{poster},':content_file' => $artworkFile);
 		         die "Can't get " . $artworkName[$#artworkName]."  -- ", $response->status_line unless $response->is_success;
-			#print STDERR "ArtWork: $artworkFile\n";
+			foreach my $a (keys %{$data->{movie}}){
+				$videoSRT->{$a}=$data->{movie}->{$a};
+			}
 			$videoSRT->{cover}=$artworkFile;
-			#print "=============================================================================\n";
 		}
 	}else{
 		print STDERR "ERROR :: Wrong IMDBiD\n";
@@ -818,13 +839,13 @@ sub getMetaDataIMDBPERL{
                 print "Cover: ".$imdbObj->poster()."\n";
 				print "Summary: " . $imdbObj->storyline() . "\n";
 				#print "TVShow: " . $imdbObj->episodeof()->[0] . "\n";
-				#print Dumper($imdbObj->episodeof());
-				# foreach $b (keys %{$imdbObj->episodeof()}){
-				# 	print "TVShow: " . $b ."\n";
-				# }
-				# foreach my $a (keys %{$imdbObj}){
-				#  	print $a ."\t" . $imdbObj->$a ."\n";
-				# }
+				print Dumper($imdbObj->episodeof());
+				foreach $b (keys %{$imdbObj->episodeof()}){
+					print "TVShow: " . $b ."\n";
+				}
+				foreach my $a (keys %{$imdbObj}){
+					print $a ."\t" . $imdbObj->$a ."\n";
+				}
         } else {
                 print "Something wrong: ".$imdbObj->error;
         }
@@ -854,6 +875,7 @@ sub GetSubtitles{
 		foreach my $subtitle_info ( @{$result->{data}} )
 		{
 			foreach my $a (keys %{$subtitle_info}){
+				#print "$a\t" . $subtitle_info->{$a}->value . "\n";
 				$videoSRT->{$a}=$subtitle_info->{$a};
 			}
 	    	my $gzfilename=$filename. "." .  $subtitle_info->{ISO639}->value . "." . $subtitle_info->{SubFormat}->value .".gz";
