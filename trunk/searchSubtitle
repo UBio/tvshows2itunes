@@ -1,13 +1,14 @@
 #!/usr/bin/perl
 
 use strict;
-use RPC::XML;
-require RPC::XML::Client;
+use lib 'lib/Library/Perl/Updates/5.12.3/';
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError) ;
-use IMDB::Film;
-use XML::Simple;
-use Data::Dumper;
 use Getopt::Long;
+use lib 'lib/lib/perl5/site_perl/';
+use RPC::XML;
+use lib 'lib/';
+use XML::Simple;
+require RPC::XML::Client;
 
 my $app_name="TVShow2iTunes";
 my $ua = LWP::UserAgent->new();
@@ -679,9 +680,8 @@ sub Recoding{
 		system($audio_cmd);
 		print "LOG :: Extracting Audio ACC file\n";
 		system($audio_cmd_convert);
-		print "LOG :: Creation of $outputfilename for $transcode\n";
+		print "LOG :: Creation of m4v file for $transcode\n";
 		system($m4v_cmd);
-		print "LOG :: Done !\n";
 		system("rm $ac3file");
 		system("rm $h264file");
 		system("rm $aacfile");
@@ -696,7 +696,7 @@ sub MetaData{
 	my $inputfilename=shift;
 	my $cmd="bin/AtomicParsley $inputfilename --overWrite ";
 	$cmd .="--artwork ". $videoSRT->{cover}." ";
-	$cmd .="--TVShowName Misfits ";
+	$cmd .="--TVShowName \"".$videoSRT->{MovieName}->value."\" ";
 	$cmd .="--stik \"TV Show\" ";
 	$cmd .="--TVEpisode \"".$videoSRT->{title}."\" ";
 	$cmd .="--TVSeasonNum 1 ";
@@ -706,8 +706,9 @@ sub MetaData{
 	$cmd .="--year \"".$videoSRT->{year}."\" ";
 	$cmd .="--description \"".$videoSRT->{plot}."\" ";
 	#print "Atomic:: $cmd\n";
+	print "LOG :: Adding Metadata !\n";
 	system($cmd);
-	#bin/AtomicParsley ../Data/misfits.s01e03.720p.hdtv.x264-bia_iPad.m4v --artwork /tmp/MV5BMjAxNTk2MjM2NF5BMl5BanBnXkFtZTcwMjQyNDMyNA@@._V1_SX320.jpg  --TVShowName Misfits --stik "TV Show" --TVEpisode "Chapter Three" --TVSeasonNum 1 --title "Misfists Chapter Three"
+	print "LOG :: Done !\n";
 }
 sub getStreams{
 	my $inputfilename=shift;
