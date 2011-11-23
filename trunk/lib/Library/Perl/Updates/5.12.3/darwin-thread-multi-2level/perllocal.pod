@@ -1,0 +1,66 @@
+=head2 Wed Nov 23 12:22:34 2011: C<Module> L<IO::Compress|IO::Compress>
+
+=over 4
+
+=item *
+
+C<installed into: /Users/eandres/Proyectos/Organizer/tvshows2itunes/lib//Library/Perl/Updates/5.12.3>
+
+=item *
+
+C<LINKTYPE: dynamic>
+
+=item *
+
+C<VERSION: 2.040>
+
+=item *
+
+C<EXE_FILES: >
+
+=back
+
+=head2 Wed Nov 23 12:27:52 2011: C<Module> L<RPC::XML|RPC::XML>
+
+=over 4
+
+=item *
+
+C<installed into: /Users/eandres/Proyectos/Organizer/tvshows2itunes/lib//lib/perl5/site_perl>
+
+=item *
+
+C<LINKTYPE: dynamic>
+
+=item *
+
+C<VERSION: 0.76>
+
+=item *
+
+C<EXE_FILES: etc/make_method>
+
+=back
+
+=head2 Wed Nov 23 12:33:41 2011: C<Module> L<Getopt::Long|Getopt::Long>
+
+=over 4
+
+=item *
+
+C<installed into: /Users/eandres/Proyectos/Organizer/tvshows2itunes/lib//Library/Perl/Updates/5.12.3>
+
+=item *
+
+C<LINKTYPE: dynamic>
+
+=item *
+
+C<VERSION: 2.38>
+
+=item *
+
+C<EXE_FILES: >
+
+=back
+
