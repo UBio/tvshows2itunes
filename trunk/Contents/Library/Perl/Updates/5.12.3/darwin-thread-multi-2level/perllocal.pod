@@ -1,0 +1,22 @@
+=head2 Sun Dec 11 13:26:40 2011: C<Module> L<RPC::XML|RPC::XML>
+
+=over 4
+
+=item *
+
+C<installed into: /Users/eandres/Proyectos/Organizer/tvshows2itunes/Contents//lib/perl5/site_perl>
+
+=item *
+
+C<LINKTYPE: dynamic>
+
+=item *
+
+C<VERSION: 0.76>
+
+=item *
+
+C<EXE_FILES: etc/make_method>
+
+=back
+
