@@ -15,19 +15,24 @@ my $ua = LWP::UserAgent->new();
 my $useragent=$ua->agent($app_name);
 my $cli;
 my $videoSRT;
+my $sortedSub;
 my $convert=undef;
 my $same_specie;
-my $lang="eng";
+my @lang=("eng");
 my $help_lang;
 my $help;
 my $input;
 my $transcode;
+my @imdbs;
+my @movienames;
+my @srtfiles;
+my $ISO639;
 GetOptions(
 	"i=s" => \$input,
 	"input=s" => \$input,
 	"help" => \$help,
-	"l=s" => \$lang,
-	"lang=s" => \$lang,
+	"l=s" => \@lang,
+	"lang=s" => \@lang,
 	"help-lang" => \$help_lang,
 	"t=s" => \$transcode,
 	"transcode=s" => \$transcode
@@ -605,8 +610,8 @@ sub main{
 		GetSubtitles($filename,$login);
 
 		##Getting the metadata########
-		if(defined($videoSRT->{IDMovieImdb})){
-			getMetaDataIMDBAPI($videoSRT->{IDMovieImdb}->value);
+		if($imdbs[0]){
+			getMetaDataIMDBAPI($imdbs[0]);
 			#getMetaDataIMDBPERL($imdb);
 			#getMetaDataOpen($imdb);
 			#############################
@@ -651,7 +656,6 @@ sub Recoding{
 	my $inputfilename=shift;
 	my $transcode=shift || "iPad";
 	my $SubtitlesFile=shift;
-	
 	my $outputfilename = substr $inputfilename, 0, rindex( $inputfilename, q{.} );
 	$outputfilename.="_$transcode.m4v";
 	
@@ -662,7 +666,6 @@ sub Recoding{
 	}
 	else{
 			$outputfilename=quotemeta($outputfilename);
-			print "Generating $outputfilename\n";
 			if($inputfilename =~ /\.mkv$/){
 			my ($videoS,$audio)=getStreams($inputfilename);
 			$convert=1;
@@ -676,42 +679,35 @@ sub Recoding{
 			my $audio_cmd;
 			if($audio->{Format} eq "Digital Theater Systems"){
 				print "LOG :: ".$audio->{Format} . " Found, coverting to AC3 5.1\n";
-				# $audio_cmd="/usr/bin/Contents/bin/mkvextract tracks $inputfilename ".$audio->{id}.":$ac3file &>/dev/null";
 				$audio_cmd="/usr/bin/Contents/bin/mencoder $inputfilename -aid 0 -ovc copy -oac lavc -lavcopts acodec=ac3:abitrate=320 -channels 6 -af pan=6:0:1:0:0:0:0:0:0:0:0:1:0:0:0:0:0:0:1:0:0:1:0:0:0:1:0:0:0:0:0:0:0:0:1:0:0 -srate $audio->{Sampling_rate}000 -of rawaudio -o $ac3file &>/dev/null";
 			}else{
 				$audio_cmd="/usr/bin/Contents/bin/mkvextract tracks $inputfilename ".$audio->{id}.":$ac3file &>/dev/null";
-			
 			}
-		
 			my $audio_cmd_convert="/usr/bin/Contents/bin/mencoder $inputfilename -aid 0 -ovc copy -oac faac -faacopts br=160:mpeg=4:object=2 -channels $audio->{Channel} -srate $audio->{Sampling_rate}000 -of rawaudio -o $aacfile &>/dev/null" if ($convert);
 			my $m4v_cmd;
+			my $check=undef;
+			my $device;
 			if($SubtitlesFile eq "NO"){
+				$check++;
 				$movieName=$inputfilename;
-				if(lc($transcode) eq "ipad" or lc($transcode) eq "iphone"){
-					$m4v_cmd ="/usr/bin/Contents/bin/mp4box -add $inputfilename\.h264:lang=$audio->{language} -add $inputfilename\.ac3:lang=$audio->{language} -add $inputfilename\.aac:lang=".$audio->{language}." -keepall -ipod -new -fps $videoS->{Frate} $outputfilename &>/dev/null";
-				}
-				else{                                                                                                                                                                                              
-					$m4v_cmd ="/usr/bin/Contents/bin/mp4box -add $inputfilename\.h264:lang=$audio->{language} -add $inputfilename\.ac3:lang=$audio->{language} -add $inputfilename\.aac:lang=".$audio->{language}." -keepall -new -fps $videoS->{Frate} $outputfilename &>/dev/null";
-			
-				}
+				if(lc($transcode) eq "ipad" or lc($transcode) eq "iphone"){ $device="-ipod";}                                                                                                                                                                                           
+					$m4v_cmd ="/usr/bin/Contents/bin/mp4box -add $inputfilename\.h264:lang=$audio->{language} -add $inputfilename\.ac3:lang=$audio->{language} -add $inputfilename\.aac:lang=".$audio->{language}." -keepall $device -new -fps $videoS->{Frate} $outputfilename &>/dev/null";
 			}
 			else{
-
-				$movieName=$videoSRT->{MovieName}->value;
-	
+				$movieName=$movienames[0]->value;
 				#Notifing to the user;
 				#`bin/growlnotify -m "Converting  $movieName"`;
-
-			
-				if(lc($transcode) eq "ipad" or lc($transcode) eq "iphone"){
-					$m4v_cmd ="/usr/bin/Contents/bin/mp4box -add $inputfilename\.h264:lang=$audio->{language} -add $inputfilename\.ac3:lang=$audio->{language} -add $inputfilename\." .  $videoSRT->{ISO639}->value . "." . $videoSRT->{SubFormat}->value .":lang=" . $videoSRT->{ISO639}->value.":group=2:disable -add $inputfilename\.aac:lang=".$audio->{language}." -disable 2 -group-add trackId=2:trackId=4 -keepall -ipod -new -fps $videoS->{Frate} $outputfilename &>/dev/null";
+				my $subtitleSentence;
+				my $NumeberofId=3;
+				foreach my $srtfile(@srtfiles){
+					if($srtfile){
+						$NumeberofId++;
+						$subtitleSentence.="-add $srtfile#1:lang=".$ISO639->{$srtfile}.":group=2:disable ";
+					}
 				}
-				else{
-					$m4v_cmd ="/usr/bin/Contents/bin/mp4box -add $inputfilename\.h264:lang=$audio->{language} -add $inputfilename\.ac3:lang=$audio->{language} -add $inputfilename\." .  $videoSRT->{ISO639}->value . "." . $videoSRT->{SubFormat}->value .":lang=" . $videoSRT->{ISO639}->value.":group=2:disable -add $inputfilename\.aac:lang=".$audio->{language}." -disable 2 -group-add trackId=2:trackId=4 -keepall -new -fps $videoS->{Frate} $outputfilename &>/dev/null";
-			
-				}
-			
-				#print "FILE :: To create $outputfilename\t(" . $videoSRT->{MovieName}->value . ")\n";
+				my $device;
+				if(lc($transcode) eq "ipad" or lc($transcode) eq "iphone"){ $device="-ipod";}
+				$m4v_cmd ="/usr/bin/Contents/bin/mp4box -add $inputfilename\.h264:lang=$audio->{language} -add $inputfilename\.ac3:lang=$audio->{language} $subtitleSentence -add $inputfilename\.aac:lang=".$audio->{language}." -disable 2 -group-add trackId=2:trackId=$NumeberofId -keepall $device -new -fps $videoS->{Frate} $outputfilename &>/dev/null";				
 			}
 				#print "$Video_cmd\n$audio_cmd\n$audio_cmd_convert\n$m4v_cmd\n";
 				print "LOG :: Extracting H.264 file\n";
@@ -725,7 +721,8 @@ sub Recoding{
 				system("rm $ac3file");
 				system("rm $h264file");
 				system("rm $aacfile");
-				MetaData($outputfilename,"NO");
+				
+				MetaData($outputfilename) if(!defined($check));
 		
 		}else{
 			print STDERR "ERROR :: At this moment only mkv files can be transcoded\n";
@@ -736,22 +733,32 @@ sub Recoding{
 sub MetaData{
 	my $inputfilename=shift;
 	my $SubtitlesFile=shift;
-	if($SubtitlesFile ne "NO"){
-		my $cmd="/usr/bin/Contents/bin/AtomicParsley $inputfilename --overWrite ";
-		$cmd .="--artwork ". $videoSRT->{cover}." ";
-		$cmd .="--TVShowName \"".$videoSRT->{MovieName}->value."\" ";
-		$cmd .="--stik \"TV Show\" ";
-		$cmd .="--TVEpisode \"".$videoSRT->{title}."\" ";
-		$cmd .="--TVSeasonNum 1 ";
-		$cmd .="--title \"".$videoSRT->{title}."\" ";
-		$cmd .="--genre \"".$videoSRT->{genre}."\" ";
-		$cmd .="--comment \"".$videoSRT->{plot}."\" ";
-		$cmd .="--year \"".$videoSRT->{year}."\" ";
-		$cmd .="--description \"".$videoSRT->{plot}."\" ";
-		print "Atomic:: $cmd\n";
-		print "LOG :: Adding Metadata !\n";
-		system($cmd);
+	my $showName;
+	if($videoSRT->{MovieName}->value =~ /\"/){
+		$showName=$videoSRT->{MovieName}->value;
+		$showName=~ s/\"//g;
+		$showName=~ s/$videoSRT->{title}//g;
+		$showName=~ s/\s+$//g;
 	}
+	else{
+		$showName=$videoSRT->{MovieName}->value;
+	}
+	my $cmd="/usr/bin/Contents/bin/AtomicParsley $inputfilename --overWrite ";
+	$cmd .="--artwork ". $videoSRT->{cover}." ";
+	$cmd .="--TVShowName \"".$showName."\" ";
+	$cmd .="--stik \"TV Show\" ";
+	$cmd .="--TVEpisode \" ".$videoSRT->{Episode}->value."\" ";
+	$cmd .="--TVSeasonNum \" ".$videoSRT->{Season}->value."\" ";
+	$cmd .="--title \"".$videoSRT->{title}."\" ";
+	$cmd .="--genre \"".$videoSRT->{genre}."\" ";
+	$cmd .="--comment \"".$videoSRT->{plot}."\" ";
+	$cmd .="--year \"".$videoSRT->{year}."\" ";
+	$cmd .="--description \"".$videoSRT->{plot}."\" ";
+	#print "Atomic:: $cmd\n";
+	print "LOG :: Adding Metadata !\n";
+	system("$cmd &>/dev/null");
+	unlink($videoSRT->{cover});
+	return();
 	print "LOG :: Done !\n";
 }
 sub getStreams{
@@ -841,7 +848,8 @@ sub getStreams{
 			next;
 		}
 	}
-	close XML;	
+	close XML;
+	unlink($log_file);	
 }
 sub getMetaDataOpen{
 	my $imdb=shift;
@@ -857,12 +865,12 @@ sub getMetaDataOpen{
 }
 sub getMetaDataIMDBAPI{
 	my $imdb=shift;
+	my $tmp_file="/tmp/\.$imdb\_$$.xml";
 	
 	if($imdb>1){
 		my $url="http://www.imdbapi.com/?i=tt$imdb&t=&r=XML&plot=full";
-		my $tmp_file="/tmp/\.$imdb\_$$.xml";
 		my $response = $ua->get($url,':content_file' => $tmp_file);
-		if(-s $tmp_file >26){
+		if(-s $tmp_file >26 and defined $response){
 			my $data = XMLin($tmp_file);
 			my @artworkName=split(/\//,$data->{movie}->{poster});
 			my $artworkFile="/tmp/".$artworkName[$#artworkName];
@@ -870,13 +878,19 @@ sub getMetaDataIMDBAPI{
 		         die "Can't get " . $artworkName[$#artworkName]."  -- ", $response->status_line unless $response->is_success;
 			foreach my $a (keys %{$data->{movie}}){
 				$videoSRT->{$a}=$data->{movie}->{$a};
+				#print $a ."\t" . $data->{movie}->{$a} ."\n";
 			}
 			$videoSRT->{cover}=$artworkFile;
+		}
+		else{
+			print STDERR "ERROR :: IMDB_API seems Down, some metadata will be unavailable\n";
+			return();
 		}
 	}else{
 		print STDERR "ERROR :: Wrong IMDBiD\n";
 		exit;
 	}
+	unlink($tmp_file);
 }
 sub getMetaDataIMDBPERL{
 	my $imdb=shift;
@@ -903,66 +917,83 @@ sub getMetaDataIMDBPERL{
 	}
 }
 sub GetSubtitles{
-
+	@srtfiles="";
 	my $filename=shift;
 	my $log=shift;
 	my $size = -s $filename;
 	my $hash=OpenSubtitlesHash("$filename");
-	
-	my $result =$cli->send_request('SearchSubtitles',$log->{token}->value,[{ sublanguageid => "$lang",moviehash => $hash, moviebytesize => $size}]);
-	my $rootname=substr($filename, rindex($filename,"/")+1,length($filename)-rindex($filename,"/")-1);
-	# Stop if xml-rpc request failed
-	if ( ! defined($result) )
-	{
-	    print "--> Search failed!\n";
-	    print $RPC::XML::ERROR, "\n";
-	    exit(0);
-	}
-	else
-	{
-		print "LOG :: Searching subtitles\n";
-		my $imdb;
-		my $array_ref;
-		my $req_data = $result->{data};
-		my $result_count=0;
-
-		if(uc(ref($req_data)) =~ "ARRAY"){
-			$result_count=scalar(@$req_data);
+	foreach my $language (@lang){
+		my $result;
+		if($log->{token}->value){
+			$result =$cli->send_request('SearchSubtitles',$log->{token}->value,[{ sublanguageid => "$language",moviehash => $hash, moviebytesize => $size}]);
 		}
-	    print "LOG :: Found $result_count file for $lang\n";
-		if($result_count>0){
-			foreach my $subtitle_info ( @{$result->{data}} )
-			{
-				
-				my $gzfilename=$filename. "." .  $subtitle_info->{ISO639}->value . "." . $subtitle_info->{SubFormat}->value .".gz";
-				my $srtfilename=$filename. "." .  $subtitle_info->{ISO639}->value . "." . $subtitle_info->{SubFormat}->value;
-				if(-e $srtfilename){
-					print "WARN :: Sutbtitles already found at $srtfilename\n";
-					last;
-				}
-				else{
-					
+		my $rootname=substr($filename, rindex($filename,"/")+1,length($filename)-rindex($filename,"/")-1);
+		# Stop if xml-rpc request failed
+		#print $result ."\n";
+		if ( ! defined($result) )
+		{
+		    print "--> Search failed!\n";
+		    print $RPC::XML::ERROR, "\n";
+		    exit(0);
+		}
+		else
+		{
+			print "LOG :: Searching subtitles for $language\n";
+			my $imdb;
+			my $array_ref;
+			my $req_data = $result->{data};
+			my $result_count=0;
+
+			if(uc(ref($req_data)) =~ "ARRAY"){
+				$result_count=scalar(@$req_data);
+			}
+		    print "LOG :: Found $result_count file for $language\n";
+			my $maxCount=0;
+			if($result_count>0){
+				#More than one result, get the most downloaded one!
+				foreach my $subtitle_info ( @{$result->{data}} ){
 					foreach my $a (keys %{$subtitle_info}){
-						#print "$a\t" . $subtitle_info->{$a}->value . "\n";
-						$videoSRT->{$a}=$subtitle_info->{$a};
+						$sortedSub->{$language}->{$subtitle_info->{SubDownloadsCnt}->value}->{$a}=$subtitle_info->{$a};
+						#order by downloadCount
+						if($maxCount< $subtitle_info->{SubDownloadsCnt}->value){
+							$maxCount=$subtitle_info->{SubDownloadsCnt}->value;
+						}
 					}
-
-					my $response = $ua->get( $subtitle_info->{SubDownloadLink}->value,':content_file' => $gzfilename);
-					         die "Can't get " . $subtitle_info->{SubDownloadLink}->value."  -- ", $response->status_line unless $response->is_success;
-
-					my $status = gunzip $gzfilename => $srtfilename or die "gunzip failed: $GunzipError\n";
-					$imdb=$subtitle_info->{IDMovieImdb}->value;
-					unlink($gzfilename);
 				}
 			}
-			return($imdb) if($imdb>1);
-		}
-		else{
-			$videoSRT=undef;
-			return(0); 
+			else{
+				#$videoSRT=undef;
+				return(0); 
+			}
+			#Max downlaoded SubDownloadsCnt
+			my $cont=0;
+			foreach my $subtitle_info ( keys %{$sortedSub->{$language}->{$maxCount}} )
+			{
+				$videoSRT->{$subtitle_info}=$sortedSub->{$language}->{$maxCount}->{$subtitle_info};
+			}
+			my $gzfilename=$filename. "." .  $sortedSub->{$language}->{$maxCount}->{ISO639}->value . "." . $sortedSub->{$language}->{$maxCount}->{SubFormat}->value .".gz";
+			my $srtfilename=$filename. "." .  $sortedSub->{$language}->{$maxCount}->{ISO639}->value . "." . $sortedSub->{$language}->{$maxCount}->{SubFormat}->value;
+			push (@srtfiles,$srtfilename) if($srtfilename);
+			$ISO639->{$srtfilename}=$sortedSub->{$language}->{$maxCount}->{ISO639}->value if ($srtfilename);
+			if(-e $srtfilename){
+				print "WARN :: Sutbtitles already found at $srtfilename\n";
+				last;
+			}
+			else{
+				my $response = $ua->get( $sortedSub->{$language}->{$maxCount}->{SubDownloadLink}->value,':content_file' => $gzfilename);
+				die "Can't get " . $sortedSub->{$language}->{$maxCount}->{SubDownloadLink}->value."  -- ", $response->status_line unless $response->is_success;
+				my $status = gunzip $gzfilename => $srtfilename or die "gunzip failed: $GunzipError\n";
+				unlink($gzfilename);
+				if($language eq "eng"){
+					$videoSRT->{Season}=$sortedSub->{$language}->{$maxCount}->{SeriesSeason};
+					$videoSRT->{Episode}=$sortedSub->{$language}->{$maxCount}->{SeriesEpisode};
+					$videoSRT->{MovieName}=$sortedSub->{$language}->{$maxCount}->{MovieName};
+					push @imdbs, $sortedSub->{$language}->{$maxCount}->{IDMovieImdb}->value;
+					push @movienames,$sortedSub->{$language}->{$maxCount}->{MovieName};
+				}
+			}
 		}
 	}
-
 }
 sub OpenSubtitlesHash {
         my $filename = shift or die("Need video filename");
