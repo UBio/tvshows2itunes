@@ -36,7 +36,7 @@ sub new{
 sub main{
 	my $TVShow2iTunes=shift;
 	
-	if($TVShow2iTunes->{input} !~ /\.srt/ and $TVShow2iTunes->{input} !~ /\.m4v/){
+	if($TVShow2iTunes->{input} !~ /\.srt/ ){#and $TVShow2iTunes->{input} !~ /\.m4v/){
 		#getting the filename
 		$TVShow2iTunes->{ShortName}=substr($TVShow2iTunes->{input}, rindex($TVShow2iTunes->{input},"/")+1,length($TVShow2iTunes->{input})-rindex($TVShow2iTunes->{input},"/")-1);
 		print STDERR "Searching for " .$TVShow2iTunes->{ShortName}."\n";
@@ -77,6 +77,7 @@ sub language_codes{
 		chomp;
 		my ($IdSubLanguage,$ISO639,$LanguageName,$UploadEnabled,$WebEnabled)=split(/\t/,$_);
 		$TVShow2iTunes->{ISO639}->{$IdSubLanguage}=$ISO639++;
+		# $TVShow2iTunes->{IdSubLanguage_ISO}->{$ISO639}=$IdSubLanguage++;
 		$TVShow2iTunes->{IdSubLanguage}->{$IdSubLanguage}=$LanguageName++;
 	}
 	close CODES;

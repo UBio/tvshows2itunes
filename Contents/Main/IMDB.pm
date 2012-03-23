@@ -42,10 +42,10 @@ sub getMetaDataIMDBAPI{
 				my $response = $TVShow2iTunes->{ua}->get( $data->{movie}->{poster},':content_file' => $artworkFile);
 			         die "Can't get " . $artworkName[$#artworkName]."  -- ", $response->status_line unless $response->is_success;
 				foreach my $a (keys %{$data->{movie}}){
-					$videoSRT->{$a}=$data->{movie}->{$a};
-					#print $a ."\t" . $data->{movie}->{$a} ."\n";
+					$TVShow2iTunes->{$a}=$data->{movie}->{$a};
+					# print $a ."\t" . $data->{movie}->{$a} ."\n";
 				}
-				$videoSRT->{cover}=$artworkFile;
+				$TVShow2iTunes->{cover}=$artworkFile;
 			}
 			else{
 				print STDERR "ERROR :: IMDB_API seems Down, some metadata will be unavailable\n";
@@ -64,37 +64,38 @@ sub getMetaDataIMDBAPI{
 
 
 sub MetaData{
-	my ($subtitles,$TVShow2iTunes)=@_;
-	
-	my $inputfilename=shift;
-	my $SubtitlesFile=shift;
+	my ($TVShows2iTunes)=shift;
+
 	my $showName;
-	if($videoSRT->{MovieName}->value =~ /\"/){
-		$showName=$videoSRT->{MovieName}->value;
+	my %videoSRT=$TVShows2iTunes->{videoSRT};
+	if($TVShows2iTunes->{videoSRT}{MovieName}->value =~ /\"/){
+		$showName=$TVShows2iTunes->{videoSRT}{MovieName}->value;
 		$showName=~ s/\"//g;
-		$showName=~ s/$videoSRT->{title}//g;
-		$showName=~ s/\s+$//g;
+		$showName=~ s/$TVShows2iTunes->{title}//g;
+A		$showName=~ s/\s+$//g;
+		
 	}
 	else{
-		$showName=$videoSRT->{MovieName}->value;
+		$showName=$TVShows2iTunes->{videoSRT}{MovieName}->value;
 	}
-	my $cmd="/usr/bin/Contents/bin/AtomicParsley $inputfilename --overWrite ";
-	$cmd .="--artwork ". $videoSRT->{cover}." ";
+	
+	my $cmd="/usr/bin/Contents/bin/AtomicParsley " . quotemeta($TVShows2iTunes->{outputfilename})." --overWrite ";
+	$cmd .="--artwork ". $TVShows2iTunes->{cover}." ";
 	$cmd .="--TVShowName \"".$showName."\" ";
 	$cmd .="--stik \"TV Show\" ";
-	$cmd .="--TVEpisode \" ".$videoSRT->{Episode}->value."\" ";
-	$cmd .="--TVSeasonNum \" ".$videoSRT->{Season}->value."\" ";
-	$cmd .="--title \"".$videoSRT->{title}."\" ";
-	$cmd .="--genre \"".$videoSRT->{genre}."\" ";
-	$cmd .="--comment \"".$videoSRT->{plot}."\" ";
-	$cmd .="--year \"".$videoSRT->{year}."\" ";
-	$cmd .="--description \"".$videoSRT->{plot}."\" ";
-	#print "Atomic:: $cmd\n";
+	$cmd .="--TVEpisode \" ".$TVShows2iTunes->{videoSRT}{Episode}->value."\" ";
+	$cmd .="--TVSeasonNum \" ".$TVShows2iTunes->{videoSRT}{Season}->value."\" ";
+	$cmd .="--title \"".$TVShows2iTunes->{title}."\" ";
+	$cmd .="--genre \"".$TVShows2iTunes->{genre}."\" ";
+	$cmd .="--comment \"".$TVShows2iTunes->{plot}."\" ";
+	$cmd .="--year \"".$TVShows2iTunes->{year}."\" ";
+	$cmd .="--description \"".$TVShows2iTunes->{plot}."\" ";
+	#print "Atomic:: $cmd\n\n";
 	print "LOG :: Adding Metadata !\n";
 	system("$cmd &>/dev/null");
-	unlink($videoSRT->{cover});
+	#system("$cmd");
+	unlink($TVShows2iTunes->{cover});
 	return();
-	print "LOG :: Done !\n";
 }
 sub getMetaDataIMDBPERL{
 	my ($subtitles,$TVShow2iTunes)=@_;
