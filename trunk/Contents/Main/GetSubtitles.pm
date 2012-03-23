@@ -43,10 +43,10 @@ sub login{
 	if($cli->send_request('ServerInfo')){
 		$TVShow2iTunes->{login}=$cli->send_request('LogIn',("","","eng"),$TVShow2iTunes->{ua}->agent($TVShow2iTunes->{app_name}));
 		# Login failed?
-	    if ( ! defined($TVShow2iTunes->{login}) )
+	    if ( ! defined($TVShow2iTunes->{login}) or ! defined($TVShow2iTunes->{login}->{token}->value))
 	    {
-	        print STDERR "ERROR :: ";
-	        print $RPC::XML::ERROR, "\n";
+	        print STDERR "ERROR :: Opensubtitles is down. Please try later\n";
+	        # print $RPC::XML::ERROR, "\n";
 	        exit(0);
 	    }
 	}
@@ -64,23 +64,28 @@ sub GetSubtitles{
 	my $TVShow2iTunes=shift;	
 	my $filename=$TVShow2iTunes->{input};
 	my @imdbs;
-	my @lang=("eng,spa");
 	my $all_lang;
 	my $sortedSub;
 	my $videoSRT;
 	my $convert=undef;
-	my @srtfiles;
+	my $srtfiles;
 	my $ISO639;
 	my @movienames;
-	@srtfiles="";
 	my $size = -s $filename;
+	my @lang=$TVShow2iTunes->{lang};
+	push(@lang, "eng");
 	
 	my $hash=OpenSubtitlesHash($TVShow2iTunes);
 	my @local_lang;
 	foreach my $language (@lang){
-		my @split=split(/,/,$language);
-		for (my $var = 0; $var<=$#split; $var++) {
-			push @local_lang,$split[$var];
+		if($language =~ /,/){
+			my @split=split(/,/,$language);
+			for (my $var = 0; $var<=$#split; $var++) {
+				push @local_lang,$split[$var];
+			}
+		}
+		else{
+			push @local_lang,$language;
 		}
 	}
 	
@@ -88,9 +93,11 @@ sub GetSubtitles{
 		my $localSRT=$filename . "." . $TVShow2iTunes->{ISO639}->{$language} . ".srt";
 		if(-e $localSRT){
 			print "WARN :: Local Sutbtitles already found at $localSRT\n";
-			delete $lang[$language];
 			$ISO639->{$localSRT}=$language;
-			push (@srtfiles,$localSRT);
+			$TVShow2iTunes->{SRT_ISO639}->{$localSRT}=$language;
+			$srtfiles->{$localSRT}++;
+			delete $lang[$language];
+			$TVShow2iTunes->{LOCAL}="Yes";
 		}
 	}
 	
@@ -102,7 +109,6 @@ sub GetSubtitles{
 		}
 		my $rootname=substr($filename, rindex($filename,"/")+1,length($filename)-rindex($filename,"/")-1);
 		# Stop if xml-rpc request failed
-		# print $result->{data} ."------\n";
 		if ( ! defined($result) )
 		{
 		    print "--> Search failed!\n";
@@ -111,12 +117,11 @@ sub GetSubtitles{
 		}
 		else
 		{
-			print "LOG :: Searching subtitles for $language\n";
+			print "LOG :: Searching subtitles for ".$TVShow2iTunes->{IdSubLanguage}->{$language}."\n";
 			my $imdb;
 			my $array_ref;
 			my $req_data = $result->{data};
 			my $result_count=0;
-			# print "localSRT es $localSRT\n";
 
 			if(uc(ref($req_data)) =~ "ARRAY"){
 				$result_count=scalar(@$req_data);
@@ -147,10 +152,11 @@ sub GetSubtitles{
 			}
 			my $gzfilename=$filename. "." .  $sortedSub->{$language}->{$maxCount}->{ISO639}->value . "." . $sortedSub->{$language}->{$maxCount}->{SubFormat}->value .".gz";
 			my $srtfilename=$filename. "." .  $sortedSub->{$language}->{$maxCount}->{ISO639}->value . "." . $sortedSub->{$language}->{$maxCount}->{SubFormat}->value;
-			push (@srtfiles,$srtfilename) if($srtfilename);
+			$srtfiles->{$srtfilename}++ if($srtfilename);
+			
 			$ISO639->{$srtfilename}=$sortedSub->{$language}->{$maxCount}->{ISO639}->value if ($srtfilename);
+			$TVShow2iTunes->{SRT_ISO639}->{$srtfilename}=$sortedSub->{$language}->{$maxCount}->{ISO639}->value if ($srtfilename);
 			if(-e $srtfilename){
-				print "WARN :: Sutbtitles already found at $srtfilename\n";
 				last;
 			}
 			else{
@@ -170,6 +176,9 @@ sub GetSubtitles{
 	}
 	$TVShow2iTunes->{imdbs}=\@imdbs;
 	$TVShow2iTunes->{movienames}=\@movienames;
+	$TVShow2iTunes->{videoSRT}=$videoSRT;
+	$TVShow2iTunes->{srtfiles}=$srtfiles;
+	
 }
 
 sub OpenSubtitlesHash {
