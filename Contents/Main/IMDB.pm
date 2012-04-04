@@ -72,7 +72,7 @@ sub MetaData{
 		$showName=$TVShows2iTunes->{videoSRT}{MovieName}->value;
 		$showName=~ s/\"//g;
 		$showName=~ s/$TVShows2iTunes->{title}//g;
-A		$showName=~ s/\s+$//g;
+		$showName=~ s/\s+$//g;
 		
 	}
 	else{

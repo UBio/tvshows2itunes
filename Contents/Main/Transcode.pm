@@ -47,7 +47,7 @@ sub Recoding{
 	}
 	else{
 		$outputfilename=quotemeta($outputfilename);
-		if($TVShows2iTunes->{ShortName} =~ /\.mkv$/ or $TVShows2iTunes->{ShortName} =~ /\.avi$/){
+		#if($TVShows2iTunes->{ShortName} =~ /\.mkv$/ or $TVShows2iTunes->{ShortName} =~ /\.avi$/){
 
 			$TVShows2iTunes->{Streams}=getStreams($TVShows2iTunes->{input});
 			$convert=1;
@@ -145,16 +145,16 @@ sub Recoding{
 					$m4v_cmd ="/usr/bin/Contents/bin/mp4box -add $TVShows2iTunes->{input}\.h264:lang=$TVShows2iTunes->{Streams}->{MEDIA}->{Audio}->{Language} -add $TVShows2iTunes->{input}\.ac3:lang=$TVShows2iTunes->{Streams}->{MEDIA}->{Audio}->{Language} $subtitleSentence -add $TVShows2iTunes->{input}\.aac:lang=".$TVShows2iTunes->{Streams}->{MEDIA}->{Audio}->{Language}." -disable 2 -group-add trackId=2:trackId=$NumeberofId -keepall $device -new -fps $TVShows2iTunes->{Streams}->{MEDIA}->{Video}->{Frame_rate} $outputfilename";				
 				}
 			}
-				print "$Video_cmd\n$audio_cmd\n$audio_cmd_convert\n$m4v_cmd\n";
+				#print "$Video_cmd\n$audio_cmd\n$audio_cmd_convert\n$m4v_cmd\n";
 				print "LOG :: Extracting H.264 file\n";
-				system($Video_cmd);#. " &>/dev/null");
+				system($Video_cmd . " &>/dev/null");
 				print "LOG :: Extracting Audio file\n";
 				system($audio_cmd . " &>/dev/null");
 				print "LOG :: Extracting Audio ACC file\n";
-				system($audio_cmd_convert);# . "&>/dev/null");
+				system($audio_cmd_convert . " &>/dev/null");
 				print "LOG :: Creation of m4v file for $TVShows2iTunes->{transcode}\n";
-				print "$m4v_cmd\n";
-				system($m4v_cmd );# . " & /dev/null");
+				#print "$m4v_cmd\n";
+				system($m4v_cmd  . " &> /dev/null");
 				system("rm -rf $ac3file");
 				system("rm -rf $h264file");
 				system("rm -rf $aacfile");
@@ -162,10 +162,10 @@ sub Recoding{
 				
 				Contents::Main::IMDB::MetaData($TVShows2iTunes) if(!defined($TVShows2iTunes->{LOCAL}));
 		
-		}else{
-			print STDERR "ERROR :: At this moment only mkv files can be transcoded (".$TVShows2iTunes->{ShortName}.")\n";
-			return();
-		}
+		#}else{
+		#	print STDERR "ERROR :: At this moment only mkv files can be transcoded (".$TVShows2iTunes->{ShortName}.")\n";
+		#	return();
+		#}
 	}
 }
 
@@ -191,6 +191,12 @@ sub getStreams{
 			}
 			if($content eq "Frame_rate"){
 				$tracks->{$content} =~ s/ fps//g;	
+			}
+			if($content eq "ID"){
+				if($tracks->{$content} =~ /\(/){
+					$tracks->{$content} =~ s/^(\d+) .*/$1/g;
+				}
+				
 			}
 			$TVShow2iTunes->{MEDIA}->{$tracks->{type}}->{$content}=$tracks->{$content}++;
 		} 
