@@ -65,16 +65,16 @@ if($input){
 		close DIR;
 	}
 	else{
-		help();
+		Contents::Main::Help->help();
 	}
 	
 }elsif($help){
-	help();
+	Contents::Main::Help->help();
 }elsif($help_lang){
-	help_lang();
+	Contents::Main::Help->help_lang();
 }
 else{
-	help();
+	Contents::Main::Help->help();
 }
 
 

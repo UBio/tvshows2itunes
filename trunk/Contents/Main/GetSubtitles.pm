@@ -41,7 +41,7 @@ sub login{
 	my $useragent=$TVShow2iTunes->{ua}->agent($TVShow2iTunes->{app_name});
 	$cli = RPC::XML::Client->new('http://api.opensubtitles.org/xml-rpc');
 	if($cli->send_request('ServerInfo')){
-		$TVShow2iTunes->{login}=$cli->send_request('LogIn',("","","eng"),$TVShow2iTunes->{ua}->agent($TVShow2iTunes->{app_name}));
+		$TVShow2iTunes->{login}=$cli->send_request('LogIn',("","","eng"),$TVShow2iTunes->{ua}->agent($TVShow2iTunes->{app_name})) || die "error";
 		# Login failed?
 	    if ( ! defined($TVShow2iTunes->{login}) or ! defined($TVShow2iTunes->{login}->{token}->value))
 	    {
